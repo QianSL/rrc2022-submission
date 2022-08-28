@@ -25,26 +25,29 @@ class TorchBasePolicy(PolicyBase):
         self.policy = torch.jit.load(
             torch_model_path, map_location=torch.device(self.device)
         )
-        self.last_action = np.zeros(9, dtype=np.float32)
+        self.last_cube = np.zeros(24+4+3, dtype=np.float32)
+        self.last_delay = 0
 
     @staticmethod
     def is_using_flattened_observations():
         return True
 
     def reset(self):
-        self.last_action = np.zeros(9, dtype=np.float32)
+        self.last_cube = np.zeros(24+4+3, dtype=np.float32)
+        self.last_delay = 0
 
     def get_action(self, observation):
-        if observation[self.delay_idx] >= 0.5 or observation[self.delay_idx-1] < 0.6:
-            action = deepcopy(self.last_action)
-        else:
-            observation = observation[self.selected_idx]
-            observation = torch.tensor(observation, dtype=torch.float, device=self.device).view(1, -1)
-            with torch.no_grad():
-                action = self.policy(observation)
-            action = action.detach().numpy()[0]
-            action = np.clip(action, self.action_space.low, self.action_space.high)
-            self.last_action = deepcopy(action)
+        if observation[self.delay_idx] != self.last_delay and (observation[self.delay_idx] < 0.5 or observation[self.delay_idx-1] > 0.6):
+            self.last_cube = 0.3 * self.last_cube + 0.7 * observation[self.pose_start: self.pose_end]
+            self.last_delay = observation[self.delay_idx]
+        observation[self.pose_start: self.pose_end] = deepcopy(self.last_cube)
+        observation = observation[self.selected_idx]
+        observation = torch.tensor(observation, dtype=torch.float, device=self.device).view(1, -1)
+        with torch.no_grad():
+            action = self.policy(observation)
+        action = action.detach().numpy()[0]
+        action = np.clip(action, self.action_space.low, self.action_space.high)
+        self.last_action = deepcopy(action)
         return action
 
 
@@ -61,6 +64,8 @@ class TorchPushExpertPolicy(TorchBasePolicy):
         pose_idx = list(range(15, 78)) + list(range(79, 97))  # lift: 57~120, 121~139, push: 15~78, 79~97
         self.selected_idx = pre_action_idx + goal_idx + pose_idx
         self.delay_idx = 16
+        self.pose_start = 17
+        self.pose_end = 48
         super().__init__(model, action_space, observation_space, episode_length)
 
 
@@ -77,6 +82,8 @@ class TorchLiftExpertPolicy(TorchBasePolicy):
         pose_idx = list(range(57, 120)) + list(range(121, 139))  # lift: 57~120, 121~139, push: 15~78, 79~97
         self.selected_idx = pre_action_idx + goal_idx + pose_idx
         self.delay_idx = 58
+        self.pose_start = 59
+        self.pose_end = 90
         super().__init__(model, action_space, observation_space, episode_length)
 
 class TorchPushMixedPolicy(TorchBasePolicy):
@@ -92,6 +99,8 @@ class TorchPushMixedPolicy(TorchBasePolicy):
         pose_idx = list(range(15, 78)) + list(range(79, 97))  # lift: 57~120, 121~139, push: 15~78, 79~97
         self.selected_idx = pre_action_idx + goal_idx + pose_idx
         self.delay_idx = 16
+        self.pose_start = 17
+        self.pose_end = 48
         super().__init__(model, action_space, observation_space, episode_length)
 
 
@@ -108,4 +117,6 @@ class TorchLiftMixedPolicy(TorchBasePolicy):
         pose_idx = list(range(57, 120)) + list(range(121, 139))  # lift: 57~120, 121~139, push: 15~78, 79~97
         self.selected_idx = pre_action_idx + goal_idx + pose_idx
         self.delay_idx = 58
+        self.pose_start = 59
+        self.pose_end = 90
         super().__init__(model, action_space, observation_space, episode_length)
