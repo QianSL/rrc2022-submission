@@ -1,4 +1,7 @@
 """Example policy for Real Robot Challenge 2022"""
+
+from copy import deepcopy
+
 import numpy as np
 import torch
 
@@ -22,21 +25,26 @@ class TorchBasePolicy(PolicyBase):
         self.policy = torch.jit.load(
             torch_model_path, map_location=torch.device(self.device)
         )
+        self.last_action = np.zeros(9, dtype=np.float32)
 
     @staticmethod
     def is_using_flattened_observations():
         return True
 
     def reset(self):
-        pass  # nothing to do here
+        self.last_action = np.zeros(9, dtype=np.float32)
 
     def get_action(self, observation):
-        observation = observation[self.selected_idx]
-        observation = torch.tensor(observation, dtype=torch.float, device=self.device).view(1, -1)
-        with torch.no_grad():
-            action = self.policy(observation)
-        action = action.detach().numpy()[0]
-        action = np.clip(action, self.action_space.low, self.action_space.high)
+        if observation[self.delay_idx] >= 0.5 or observation[self.delay_idx-1] < 0.6:
+            action = deepcopy(self.last_action)
+        else:
+            observation = observation[self.selected_idx]
+            observation = torch.tensor(observation, dtype=torch.float, device=self.device).view(1, -1)
+            with torch.no_grad():
+                action = self.policy(observation)
+            action = action.detach().numpy()[0]
+            action = np.clip(action, self.action_space.low, self.action_space.high)
+            self.last_action = deepcopy(action)
         return action
 
 
@@ -52,6 +60,7 @@ class TorchPushExpertPolicy(TorchBasePolicy):
         goal_idx = list(range(12, 15)) # lift: 33~57; push: 12~15
         pose_idx = list(range(15, 78)) + list(range(79, 97))  # lift: 57~120, 121~139, push: 15~78, 79~97
         self.selected_idx = pre_action_idx + goal_idx + pose_idx
+        self.delay_idx = 16
         super().__init__(model, action_space, observation_space, episode_length)
 
 
@@ -67,6 +76,7 @@ class TorchLiftExpertPolicy(TorchBasePolicy):
         goal_idx = list(range(33, 57)) # lift: 33~57; push: 12~15
         pose_idx = list(range(57, 120)) + list(range(121, 139))  # lift: 57~120, 121~139, push: 15~78, 79~97
         self.selected_idx = pre_action_idx + goal_idx + pose_idx
+        self.delay_idx = 58
         super().__init__(model, action_space, observation_space, episode_length)
 
 class TorchPushMixedPolicy(TorchBasePolicy):
@@ -81,6 +91,7 @@ class TorchPushMixedPolicy(TorchBasePolicy):
         goal_idx = list(range(12, 15)) # lift: 33~57; push: 12~15
         pose_idx = list(range(15, 78)) + list(range(79, 97))  # lift: 57~120, 121~139, push: 15~78, 79~97
         self.selected_idx = pre_action_idx + goal_idx + pose_idx
+        self.delay_idx = 16
         super().__init__(model, action_space, observation_space, episode_length)
 
 
@@ -96,4 +107,5 @@ class TorchLiftMixedPolicy(TorchBasePolicy):
         goal_idx = list(range(33, 57)) # lift: 33~57; push: 12~15
         pose_idx = list(range(57, 120)) + list(range(121, 139))  # lift: 57~120, 121~139, push: 15~78, 79~97
         self.selected_idx = pre_action_idx + goal_idx + pose_idx
+        self.delay_idx = 58
         super().__init__(model, action_space, observation_space, episode_length)
