@@ -3,7 +3,7 @@ task = "push"  # "push" or "lift"
 dataset_type = "expert"  # "expert or "mixed"
 
 # Specify a policy for each task/dataset_type combination.
-push_expert_policy = "rrc2022.example.TorchPushPolicy"
-lift_expert_policy = "rrc2022.example.TorchLiftPolicy"
-push_mixed_policy = "rrc2022.example.TorchPushPolicy"
-lift_mixed_policy = "rrc2022.example.TorchLiftPolicy"
+push_expert_policy = "rrc2022.my_submission.TorchPushExpertPolicy"
+lift_expert_policy = "rrc2022.my_submission.TorchLiftExpertPolicy"
+push_mixed_policy = "rrc2022.my_submission.TorchPushMixedPolicy"
+lift_mixed_policy = "rrc2022.my_submission.TorchLiftMixedPolicy"
